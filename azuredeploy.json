@@ -8,17 +8,125 @@
         "siteLocation": {
             "type": "string",
             "defaultValue": "West US"
+        },
+        "sku": {
+            "type": "string",
+            "allowedValues": [
+                "Free",
+                "Shared",
+                "Basic",
+                "Standard"
+            ],
+            "defaultValue": "Free"
+        },
+        "virtoCommerceManagerUrl": {
+            "type": "string"
+        },
+        "virtoCommerceApiAppId": {
+            "type": "string"
+        },
+        "virtoCommerceApiSecretKey": {
+            "type": "string"
+        },
+        "contentStorageConnectionString": {
+            "type": "string"
+        },
+
+        "repoUrl": {
+            "type": "string"
+        },
+        "branch": {
+            "type": "string"
+        },
+        "hostingPlanName": {
+            "type": "string"
+        },
+        "workerSize": {
+            "type": "string",
+            "allowedValues": [
+                "0",
+                "1",
+                "2"
+            ],
+            "defaultValue": "0"
         }
     },
     "resources": [
         {
-            "name": "[parameters('siteName')]",
-            "type": "Microsoft.Storage/storageAccounts",
+            "type": "Microsoft.Web/serverfarms",
+            "name": "[parameters('hostingPlanName')]",
             "location": "[parameters('siteLocation')]",
-            "apiVersion": "2015-06-15",
+            "apiVersion": "2014-06-01",
             "properties": {
-                "accountType": "Standard_LRS"
+                "name": "[parameters('hostingPlanName')]",
+                "sku": "[parameters('sku')]",
+                "workerSize": "[parameters('workerSize')]",
+                "numberOfWorkers": 1
             }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "name": "[parameters('siteName')]",
+            "location": "[parameters('siteLocation')]",
+            "apiVersion": "2014-06-01",
+            "dependsOn": [
+                "[concat('Microsoft.Web/serverFarms/', parameters('hostingPlanName'))]"
+            ],
+            "tags": {
+                "[concat('hidden-related:', resourceGroup().id, '/providers/Microsoft.Web/serverfarms/', parameters('hostingPlanName'))]": "empty"
+            },
+            "properties": {
+                "name": "[parameters('siteName')]",
+                "serverFarm": "[parameters('hostingPlanName')]"
+            },
+            "resources": [
+                {
+                    "type": "config",
+                    "name": "web",
+                    "apiVersion": "2014-04-01",
+                    "dependsOn": [
+                        "[concat('Microsoft.Web/Sites/', parameters('siteName'))]"
+                    ],
+                    "properties": {
+                        "connectionStrings": [
+                            {
+                                "Name": "VirtoCommerceBaseUrl",
+                                "ConnectionString": "[parameters('virtoCommerceManagerUrl')]",
+                                "Type": 3
+                            },
+                            {
+                                "Name": "ContentConnectionString",
+                                "ConnectionString": "[parameters('contentStorageConnectionString')]",
+                                "Type": 3
+                            }
+                        ],
+                        "appSettings": [
+                            {
+                                "name": "vc-public-ApiAppId",
+                                "value": "[parameters('virtoCommerceApiAppId')]"
+                            },
+                            {
+                                "name": "vc-public-ApiSecretKey",
+                                "value": "[parameters('virtoCommerceApiSecretKey')]"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": "sourcecontrols",
+                    "name": "web",
+                    "apiVersion": "2014-06-01",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Web/Sites', parameters('siteName'))]",
+                        "[concat('Microsoft.Web/Sites/', parameters('siteName'), '/config/web')]"
+                    ],
+                    "properties": {
+                        "RepoUrl": "[parameters('repoUrl')]",
+                        "branch": "[parameters('branch')]",
+                        "IsManualIntegration": true
+                    }
+                }
+            ]
         }
     ]
 }
